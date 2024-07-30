@@ -10,7 +10,7 @@ kernel.o: kernel.c
 	gcc -m32 -g -ffreestanding  -fno-pic -c  $< -o $@
 
 main.bin: main.asm
-	nasm $< -f bin -D SECTOR_COUNT_CONST=33 -o $@ 
+	nasm $< -f bin -D SECTOR_COUNT_CONST=43 -o $@ 
 isr.bin: isr.asm
 	nasm $< -f elf -o $@
 
@@ -20,11 +20,11 @@ os-image.bin: main.bin kernel.bin
 run: os-image.bin
 	qemu-system-i386 -no-reboot -no-shutdown \
 		-device isa-debug-exit,iobase=0xf4,iosize=0x04 \
-		-device i8042 \
 		-drive file=$<,format=raw,index=0,if=floppy \
 		-boot a \
 		-vga std \
-		-m 256M \
-		-k il
+		-m 256M 
+				# -device i8042 \
+		# -k il
 clean:
 	$(RM) *.bin *.o *.dis

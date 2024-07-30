@@ -6,22 +6,25 @@ int strlen(const char *str) {
     cnt++;
   return cnt;
 }
-// not mine, this is maddness look for diffrent way maybe?
-// thought we need to read and write the raw ports so idk
-// unsigned char port_byte_in(unsigned short port) {
-//   unsigned char result;
-//   __asm__("in %%dx, %%al" : "=a"(result) : "d"(port));
-//   return result;
-// }
-//
-// void outb(unsigned short port, unsigned char data) {
-//   __asm__("out %%al, %%dx" : : "a"(data), "d"(port));
-// }
-//
+int strcmp(char *c1, char *c2) {
+  int p = 0;
+  while (c1[p] != '\0' && c2[p] != '\0') {
+    if (c1[p] != c2[p++])
+      return 0;
+  }
+  return c1[p] == c2[p] && c2[p] == '\0';
+}
+int get_str_index(char **arr, char *str, int arr_size) {
+  for (int i = 0; i < arr_size; i++) {
+    if (strcmp(arr[i], str))
+      return i;
+  }
+  return -1;
+}
 #define SCREEN_WIDTH 80
 #define SCREEN_HEIGHT 25
 #define VIDEO_MEMORY 0xb8000
-
+#define KEY_AMOUNT 61
 #define CURSOR_PORT_COMMAND 0x3D4
 #define CURSOR_PORT_DATA 0x3D5
 #define SCREEN_WIDTH 80
@@ -39,6 +42,7 @@ typedef struct {
   // pushed by CPU automatically
   uint32_t eip, cs, eflags, useresp, ss;
 } registers_t;
+// not mine also this is maddness
 static inline unsigned char inb(unsigned short port) {
   unsigned char result;
   __asm__ volatile("inb %1, %0" : "=a"(result) : "Nd"(port));
@@ -107,6 +111,11 @@ void scroll_line() {
   }
   clear_row(SCREEN_HEIGHT - 1);
 }
+void clear_pixel(Cursor_position cursor) {
+  // Cursor_position hold = get_cursor_position();
+  // set_cursor_position(cursor.x, cursor.y);
+  put_pixel(' ', 0x07, cursor.x, cursor.y);
+}
 void clear_screen() {
   for (int i = 0; i < SCREEN_HEIGHT; i++) {
     clear_row(i); // might as well just write raw to buffer but idkk...
@@ -116,7 +125,10 @@ void put_string(char *string) {
   // This is some shit ass code but its low level....
   Cursor_position cursor = get_cursor_position();
   for (int i = 0; string[i] != '\0'; i++) {
-    if (string[i] == '\10') { // Backspace
+    if (string[i] == '\n') {
+      cursor.x = 0;
+      cursor.y++;
+    } else if (string[i] == '\10') { // Backspace
       cursor.x = 0;
     } else if (string[i] == '\13') { // Vertical tab
       cursor.y++;
@@ -228,8 +240,19 @@ typedef struct {
 idt_register_t idt_reg;
 extern void irq0();
 extern void irq1();
+extern void irq2();
+extern void irq3();
+extern void irq4();
+extern void irq5();
+extern void irq6();
 extern void irq7();
 extern void irq8();
+extern void irq9();
+extern void irq10();
+extern void irq11();
+extern void irq12();
+extern void irq13();
+extern void irq14();
 extern void irq15();
 void keyboard_handler(registers_t *r);
 
@@ -288,19 +311,19 @@ void isr_install() {
   // handle keyboard
   add_idt_gate(32, (uint32_t)irq0);
   add_idt_gate(33, (uint32_t)irq1);
-  // add_idt_gate(34, (uint32_t)irq2);
-  // add_idt_gate(35, (uint32_t)irq3);
-  // add_idt_gate(36, (uint32_t)irq4);
-  // add_idt_gate(37, (uint32_t)irq5);
-  // add_idt_gate(38, (uint32_t)irq6);
+  add_idt_gate(34, (uint32_t)irq2);
+  add_idt_gate(35, (uint32_t)irq3);
+  add_idt_gate(36, (uint32_t)irq4);
+  add_idt_gate(37, (uint32_t)irq5);
+  add_idt_gate(38, (uint32_t)irq6);
   add_idt_gate(39, (uint32_t)irq7);
   add_idt_gate(40, (uint32_t)irq8);
-  // add_idt_gate(41, (uint32_t)irq9);
-  // add_idt_gate(42, (uint32_t)irq10);
-  // add_idt_gate(43, (uint32_t)irq11);
-  // add_idt_gate(44, (uint32_t)irq12);
-  // add_idt_gate(45, (uint32_t)irq13);
-  // add_idt_gate(46, (uint32_t)irq14);
+  add_idt_gate(41, (uint32_t)irq9);
+  add_idt_gate(42, (uint32_t)irq10);
+  add_idt_gate(43, (uint32_t)irq11);
+  add_idt_gate(44, (uint32_t)irq12);
+  add_idt_gate(45, (uint32_t)irq13);
+  add_idt_gate(46, (uint32_t)irq14);
   add_idt_gate(47, (uint32_t)irq15);
   //
   load_idt(); // Load with ASM
@@ -367,107 +390,344 @@ void int_to_hex_string(unsigned int number, char *buffer, int buff_size) {
     }
   }
 }
+void handle_clock_pulse() {
+  static int time = 0;
+  // each pulse should add 54.9 ms
+  // if a full minute was passed we priotn
+  const int interval = (1000 * 60);
 
+  int prevM = time / interval;
+  time += 54.9;
+  int currM = time / interval;
+  if (currM > prevM) {
+    put_string("Another minute\n");
+  } else if (prevM > currM) {
+    put_string("OMG! time travel. (jk its overflow)\n");
+  }
+}
+void handle_date(char *buffer, int length) {}
+void handle_nice(char *buffer, int length) {}
+void handle_dir(char *buffer, int length) {}
+void handle_hostid(char *buffer, int length) {}
+void handle_ptx(char *buffer, int length) {}
+void handle_basename(char *buffer, int length) {}
+void handle_printenv(char *buffer, int length) {}
+void handle_base32(char *buffer, int length) {}
+void handle_stat(char *buffer, int length) {}
+void handle_chown(char *buffer, int length) {}
+void handle_install(char *buffer, int length) {}
+void handle_realpath(char *buffer, int length) {}
+void handle_runcon(char *buffer, int length) {}
+void handle_md5sum(char *buffer, int length) {}
+void handle_truncate(char *buffer, int length) {}
+void handle_unexpand(char *buffer, int length) {}
+void handle_chcon(char *buffer, int length) {}
+void handle_vdir(char *buffer, int length) {}
+void handle_wc(char *buffer, int length) {}
+void handle_nohup(char *buffer, int length) {}
+void handle_false(char *buffer, int length) {}
+void handle_expand(char *buffer, int length) {}
+void handle_head(char *buffer, int length) {}
+void handle_pwd(char *buffer, int length) {}
+void handle_chmod(char *buffer, int length) {}
+void handle_sha256sum(char *buffer, int length) {}
+void handle_cut(char *buffer, int length) {}
+void handle_sha224sum(char *buffer, int length) {}
+void handle_fold(char *buffer, int length) {}
+void handle_base64(char *buffer, int length) {}
+void handle_uniq(char *buffer, int length) {}
+void handle_uptime(char *buffer, int length) {}
+void handle_nl(char *buffer, int length) {}
+void handle_cp(char *buffer, int length) {}
+void handle_expr(char *buffer, int length) {}
+void handle_mktemp(char *buffer, int length) {}
+void handle_tac(char *buffer, int length) {}
+void handle_groups(char *buffer, int length) {}
+void handle_pinky(char *buffer, int length) {}
+void handle_comm(char *buffer, int length) {}
+void handle_arch(char *buffer, int length) {}
+void handle_split(char *buffer, int length) {}
+void handle_unlink(char *buffer, int length) {}
+void handle_stdbuf(char *buffer, int length) {}
+void handle_test(char *buffer, int length) {}
+void handle_sha1sum(char *buffer, int length) {}
+void handle_sleep(char *buffer, int length) {}
+void handle_users(char *buffer, int length) {}
+void handle_sort(char *buffer, int length) {}
+void handle_shuf(char *buffer, int length) {}
+void handle_rmdir(char *buffer, int length) {}
+void handle_mkdir(char *buffer, int length) {}
+void handle_b2sum(char *buffer, int length) {}
+void handle_readlink(char *buffer, int length) {}
+void handle_fmt(char *buffer, int length) {}
+void handle_sha512sum(char *buffer, int length) {}
+void handle_touch(char *buffer, int length) {}
+void handle_link(char *buffer, int length) {}
+void handle_whoami(char *buffer, int length) {}
+void handle_numfmt(char *buffer, int length) {}
+void handle_ln(char *buffer, int length) {}
+void handle_logname(char *buffer, int length) {}
+void handle_dircolors(char *buffer, int length) {}
+void handle_who(char *buffer, int length) {}
+void handle_seq(char *buffer, int length) {}
+void handle_true(char *buffer, int length) {}
+void handle_dirname(char *buffer, int length) {}
+void handle_sum(char *buffer, int length) {}
+void handle_mkfifo(char *buffer, int length) {}
+void handle_chroot(char *buffer, int length) {}
+void handle_paste(char *buffer, int length) {}
+void handle_pr(char *buffer, int length) {}
+void handle_od(char *buffer, int length) {}
+void handle_id(char *buffer, int length) {}
+void handle_tsort(char *buffer, int length) {}
+void handle_printf(char *buffer, int length) {}
+void handle_cat(char *buffer, int length) {}
+void handle_nproc(char *buffer, int length) {}
+void handle_chgrp(char *buffer, int length) {}
+void handle_mknod(char *buffer, int length) {}
+void handle_yes(char *buffer, int length) {}
+void handle_tty(char *buffer, int length) {}
+void handle_ls(char *buffer, int length) {}
+void handle_sha384sum(char *buffer, int length) {}
+void handle_timeout(char *buffer, int length) {}
+void handle_mv(char *buffer, int length) {}
+void handle_pathchk(char *buffer, int length) {}
+void handle_sync(char *buffer, int length) {}
+void handle_shred(char *buffer, int length) {}
+void handle_join(char *buffer, int length) {}
+void handle_stty(char *buffer, int length) {}
+void handle_uname(char *buffer, int length) {}
+void handle_du(char *buffer, int length) {}
+// void handle(char* buffer,int length){}
+void handle_tee(char *buffer, int length) {}
+void handle_df(char *buffer, int length) {}
+void handle_dd(char *buffer, int length) {}
+void handle_echo(char *buffer, int length) {}
+void handle_csplit(char *buffer, int length) {}
+void handle_tail(char *buffer, int length) {}
+void handle_env(char *buffer, int length) {}
+void handle_factor(char *buffer, int length) {}
+void handle_tr(char *buffer, int length) {}
+void handle_rm(char *buffer, int length) {}
+void handle_cksum(char *buffer, int length) {}
+#define MAX_COMMAND 1024
+void handle_command(char *command, int length) {
+  put_string("\nHandling your shell command: \n");
+  put_string(command);
+  put_string("\n");
+  char *gnu_core_utils[] = {
+      "chcon",     "chgrp",     "chown",     "chmod",    "cp",      "dd",
+      "df",        "dir",       "dircolors", "ls",       "install", "ln",
+      "ls",        "mkdir",     "mkfifo",    "mknod",    "mktemp",  "mv",
+      "realpath",  "rm",        "rmdir",     "shred",    "sync",    "touch",
+      "truncate",  "vdir",      "b2sum",     "base32",   "base64",  "cat",
+      "cksum",     "comm",      "csplit",    "cut",      "expand",  "fmt",
+      "fold",      "head",      "join",      "md5sum",   "nl",      "numfmt",
+      "od",        "paste",     "ptx",       "pr",       "sha1sum", "sha224sum",
+      "sha256sum", "sha384sum", "sha512sum", "shuf",     "sort",    "split",
+      "sum",       "tac",       "tail",      "tr",       "tsort",   "unexpand",
+      "uniq",      "wc",        "arch",      "basename", "chroot",  "date",
+      "dirname",   "du",        "echo",      "env",      "expr",    "factor",
+      "false",     "groups",    "hostid",    "id",       "link",    "logname",
+      "nice",      "nohup",     "nproc",     "pathchk",  "pinky",   "printenv",
+      "printf",    "pwd",       "readlink",  "runcon",   "seq",     "sleep",
+      "stat",      "stdbuf",    "stty",      "tee",      "test",    "timeout",
+      "true",      "tty",       "uname",     "unlink",   "unlink",  "uptime",
+      "users",     "who",       "whoami",    "yes",
+  }; // not including [ because fuck that for now //   "["};
+
+  int indx = get_str_index(gnu_core_utils, command,
+                           sizeof(gnu_core_utils) / sizeof(gnu_core_utils[0]));
+  if (indx == -1) {
+    put_string("Unkown core util \n");
+    return;
+  }
+  put_string("Gnu core util then:");
+  put_string("\n >>>>");
+}
+void shell_handle(char *new_char) {
+  static char command_buffer[MAX_COMMAND];
+  static unsigned int ptr = 0;
+
+  if (strlen(new_char) > 1) {
+    // special char then
+    if (strcmp(new_char, "BACKSPACE")) {
+      ptr--;
+      Cursor_position pos = get_cursor_position();
+      pos.x--;
+      clear_pixel(pos);
+      set_cursor_position(pos.x, pos.y);
+      // TODO: handle deleting a new line char
+    }
+    if (strcmp(new_char, "ENTER")) {
+      command_buffer[ptr++] = '\0';
+      handle_command(command_buffer, ptr);
+      ptr = 0;
+    }
+    return;
+  }
+  put_string(new_char);
+  if (ptr >= MAX_COMMAND - 1) {
+    put_string("Cant put more chars. ");
+    return;
+  }
+  command_buffer[ptr++] = new_char[0];
+}
 void keyboard_handler(registers_t *r) {
   uint8_t scancode = inb(0x60);
+
   // Process the scancode here
-  // For now, let's just print it
-  put_string("Keyboard scancode: ");
+  // put_string("Keyboard scancode: ");
   char s[16];
-  int_to_hex_string(scancode, s, 3);
-  put_string(s);
-  put_string("\10\13");
-}
-int strcmp(char *c1, char *c2) {
-  int p = 0;
-  while (c1[p] != '\0' && c2[p] != '\0') {
-    if (c1[p] != c2[p++])
-      return 0;
+  int_to_hex_string(scancode, s, 16);
+  // put_string(s);
+  // put_string("\10\13");
+
+  const char *letter_from_code[KEY_AMOUNT] = {
+      "ERROR",     "ESCAPE", "1",        "2",  "3",  "4",      "5",
+      "6",         "7",      "8",        "9",  "0",  "-",      "=",
+      "BACKSPACE", "TAB",    "q",        "w",  "e",  "r",      "t",
+      "y",         "u",      "i",        "o",  "p",  "[",      "]",
+      "ENTER",     "LCTRL",  "a",        "s",  "d",  "f",      "g",
+      "h",         "j",      "k",        "l",  ";",  "'",      "`",
+      "LSHIFT",    "\\",     "z",        "x",  "c",  "v",      "b",
+      "n",         "m",      ",",        ".",  "/",  "RSHIFT", "KEYPAD *",
+      "LALT",      "SPACE",  "CAPSLOCK", "F1", "F2", "F3",     "F4",
+      "F5"};
+
+  // put_string("Key: ");
+  if (scancode < KEY_AMOUNT) {
+    /*     put_string(" (pressed)"); */
+    shell_handle(letter_from_code[scancode]);
+  } else if (scancode >= 0x80 && scancode < 0x80 + KEY_AMOUNT) {
+    // put_string(letter_from_code[scancode - 0x80]);
+    // put_string(" (released)");
+  } else {
+    put_string("Unknown");
   }
-  return c1[p] == c2[p] && c2[p] == '\0';
+  // put_string("\10\13");
 }
-// Modify the isr_handler function to include IRQ handling
+
+// Modify the isr_handler
+// function to include IRQ handling
 void isr_handler(registers_t *r) {
   const int BUFF_SIZE = 15;
   char buffer[BUFF_SIZE]; // Increased buffer size for larger hex values
 
-  put_string("Interrupt occurred:\10\13");
-
-  put_string("ds: 0x");
-  int_to_hex_string(r->ds, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("edi: 0x");
-  int_to_hex_string(r->edi, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", esi: 0x");
-  int_to_hex_string(r->esi, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("ebp: 0x");
-  int_to_hex_string(r->ebp, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", esp: 0x");
-  int_to_hex_string(r->esp, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("ebx: 0x");
-  int_to_hex_string(r->ebx, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", edx: 0x");
-  int_to_hex_string(r->edx, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("ecx: 0x");
-  int_to_hex_string(r->ecx, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", eax: 0x");
-  int_to_hex_string(r->eax, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("int_no: 0x");
-  int_to_hex_string(r->int_no, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", err_code: 0x");
-  int_to_hex_string(r->err_code, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("eip: 0x");
-  int_to_hex_string(r->eip, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", cs: 0x");
-  int_to_hex_string(r->cs, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("eflags: 0x");
-  int_to_hex_string(r->eflags, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("useresp: 0x");
-  int_to_hex_string(r->useresp, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", ss: 0x");
-  int_to_hex_string(r->ss, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
+  // put_string("Interrupt occurred:\10\13");
+  //
+  // put_string("ds: 0x");
+  // int_to_hex_string(r->ds, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("edi: 0x");
+  // int_to_hex_string(r->edi, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string(", esi: 0x");
+  // int_to_hex_string(r->esi, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("ebp: 0x");
+  // int_to_hex_string(r->ebp, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string(", esp: 0x");
+  // int_to_hex_string(r->esp, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("ebx: 0x");
+  // int_to_hex_string(r->ebx, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string(", edx: 0x");
+  // int_to_hex_string(r->edx, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("ecx: 0x");
+  // int_to_hex_string(r->ecx, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string(", eax: 0x");
+  // int_to_hex_string(r->eax, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("int_no: 0x");
+  // int_to_hex_string(r->int_no, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string(", err_code: 0x");
+  // int_to_hex_string(r->err_code, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("eip: 0x");
+  // int_to_hex_string(r->eip, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string(", cs: 0x");
+  // int_to_hex_string(r->cs, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("eflags: 0x");
+  // int_to_hex_string(r->eflags, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
+  //
+  // put_string("useresp: 0x");
+  // int_to_hex_string(r->useresp, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string(", ss: 0x");
+  // int_to_hex_string(r->ss, buffer, BUFF_SIZE);
+  // put_string(buffer);
+  // put_string("\10\13");
 
   if (r->int_no >= 32 && r->int_no < 48) {
     // Handle IRQs
-    put_string("Not an exception \10\13");
+    // put_string("Not an exception \10\13");
+    char buff[3];
+    int_to_hex_string(r->int_no, buff, 3);
+    // put_string(buff);
+    /*
+      IRQ 0 – system timer (cannot be changed)
+      IRQ 1 – keyboard on PS/2 port (cannot be changed)
+      IRQ 2 – cascaded signals from IRQs 8–15 (any devices configured to use
+      IRQ 2 will actually be using IRQ 9) IRQ 3 – serial port controller for
+      serial port 2 (shared with serial port 4, if present) IRQ 4 – serial port
+      controller for serial port 1 (shared with serial port 3, if present) IRQ
+      5 – parallel port 3 or sound card IRQ 6 – floppy disk controller IRQ 7 –
+      parallel port 1 (shared with parallel port 2, if present). It is used for
+      printers or for any parallel port if a printer is not present. It can
+      also be potentially be shared with a secondary sound card with careful
+      management of the port. Slave PIC IRQ 8 – real-time clock (RTC) IRQ 9 –
+      Advanced Configuration and Power Interface (ACPI) system control
+      interrupt on Intel chipsets.[5] Other chipset manufacturers might use
+      another interrupt for this purpose, or make it available for the use of
+      peripherals (any devices configured to use IRQ 2 will actually be using
+      IRQ 9) IRQ 10 – The Interrupt is left open for the use of peripherals
+      (open interrupt/available, SCSI or NIC) IRQ 11 – The Interrupt is left
+      open for the use of peripherals (open interrupt/available, SCSI or NIC)
+      IRQ 12 – mouse on PS/2 port
+      IRQ 13 – CPU co-processor or integrated floating point unit or
+      inter-processor interrupt (use depends on OS) IRQ 14 – primary ATA
+      channel (ATA interface usually serves hard disk drives and CD drives) IRQ
+      15 – secondary ATA channel
+             */
     if (r->int_no == 33) {
-      put_string("Clock!\10\13");
+      // put_string("Clock!\10\13");
+      handle_clock_pulse();
     }
     if (r->int_no == 34) {
+      // put_string("Keyboard!!!!!!!!\10\13");
       keyboard_handler(r);
     }
+    if (r->int_no == 41) {
+      put_string("We got a real clock not ossilator\n");
+    }
+    if (r->int_no == 44) {
+      put_string("We got a mouse baby \n");
+    }
+
     // Send EOI (End of Interrupt) signal to PICs
     if (r->int_no >= 40) {
       outb(0xA0, 0x20); // Send EOI to slave PIC
@@ -492,6 +752,8 @@ void isr_handler(registers_t *r) {
     //   // Halt the system
     // }
   }
+  // put_string("Set interrupt flag \10\13");
+  __asm__ volatile("sti");
 }
 
 // taken from
@@ -503,31 +765,32 @@ void main() {
   //   'W', 'o', 'r', 'l', 'd', '\0'
   // };
   // const char *message = "Hello World";
-  char message[] = "Hello World";
+  char message[] = "Hello World\n";
 
-  char mess2[] = "He\10\13Lllo\10a\10\13NewLine\10\13";
-  put_string(mess2);
-  put_string(message);
-  put_string(message);
+  // char mess2[] = "He\10\13Lllo\10a\10\13NewLine\10\13";
+  // put_string(mess2);
+  // put_string(message);
+  // put_string(message);
   put_string(message);
   char print[4] = "a\10\13";
   isr_install();
-  char done[] = {'F', 'I', 'N', 'I', 'S', 'H', 'E', 'D', 0};
-  put_string(done);
-  put_string(exception_messages[0]);
-  int a = 1 / 0;
-  // irq1();
-  while (1) {
-    // for (char i = 'a'; i <= 'z'; i++) {
-    //   print[0] = i;
-    //   put_string(print);
-    // }
-    // for (int j = 0; j < 100; j++) {
-    //   for (int i = 0; i < 2000000; i++) {
-    //   }
-    // }
-    // clear_screen();
-  }
+  __asm__ volatile("sti");
+  put_string("Starting the Shell now, keyboard is loaded \n");
+  put_string(" >>>>");
+  // put_string(exception_messages[0]);
+  // int a = 1 / 0;
+  //  irq1();
+  // while (1) {
+  //   // for (char i = 'a'; i <= 'z'; i++) {
+  //   //   print[0] = i;
+  //   //   put_string(print);
+  //   // }
+  //   // for (int j = 0; j < 100; j++) {
+  //   //   for (int i = 0; i < 2000000; i++) {
+  //   //   }
+  //   // }
+  //   // clear_screen();
+  // }
   *(video_memory + 100) = 'V';
   *(video_memory + 101) = 0x0f;
 }
