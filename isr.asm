@@ -329,7 +329,6 @@ isr_common_stub:
     ;then err_code 
     
     pushad
-    
     mov ax, ds
     push eax
     mov ax, 0x10

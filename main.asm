@@ -30,7 +30,7 @@ set_mode:
     ret
 load_kernel:
     mov bx,KERNEL_OFFSET 
-    mov al,SECTOR_COUNT_CONST;3 sectors 
+    mov al,54;SECTOR_COUNT_CONST;3 sectors 
     mov [SECTOR_COUNT],al
     mov dl,[BOOT_DRIVE] 
     call load_disk
