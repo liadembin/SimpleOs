@@ -1,6 +1,6 @@
 all: run
 
-kernel.bin: kernel_entry.o kernel.o ports.o stdlib.o isr.bin
+kernel.bin: kernel_entry.o kernel.o ports.o stdlib.o vga.o isr.bin
 	ld -m elf_i386 -o $@ -Ttext 0x1000 $^ --oformat binary
 
 kernel_entry.o: asm/kernel_entry.asm
@@ -13,6 +13,8 @@ ports.o: ports.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
 stdlib.o: stdlib.c
+	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
+vga.o: vga.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
 main.bin: asm/main.asm
