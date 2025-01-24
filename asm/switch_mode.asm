@@ -7,7 +7,7 @@ switch_mode:
     mov cr0,eax
     jmp CODE_SEG:init_32bit
     ret
-%include "print_32bit.asm"
+%include "./asm/print_32bit.asm"
 [bits 32]
 init_32bit:
     mov ax, DATA_SEG        ; 5. update segment registers

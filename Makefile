@@ -1,32 +1,42 @@
+BUILD_DIR = dist
+
+# Create build directory if it doesn't exist
+$(shell mkdir -p $(BUILD_DIR))
+
 all: run
 
-kernel.bin: kernel_entry.o kernel.o ports.o stdlib.o vga.o isr.bin
+$(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel_entry.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/ports.o $(BUILD_DIR)/stdlib.o $(BUILD_DIR)/vga.o $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/isr.bin $(BUILD_DIR)/enable_paging.bin
 	ld -m elf_i386 -o $@ -Ttext 0x1000 $^ --oformat binary
 
-kernel_entry.o: asm/kernel_entry.asm
+$(BUILD_DIR)/kernel_entry.o: asm/kernel_entry.asm
 	nasm $< -f elf -o $@
 
-kernel.o: kernel.c
+$(BUILD_DIR)/kernel.o: kernel.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
-ports.o: ports.c
+$(BUILD_DIR)/ports.o: ports.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
-stdlib.o: stdlib.c
-	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
-vga.o: vga.c
+$(BUILD_DIR)/stdlib.o: stdlib.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
-main.bin: asm/main.asm
+$(BUILD_DIR)/vga.o: vga.c
+	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
+
+$(BUILD_DIR)/interrupts.o: interrupts.c
+	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
+
+$(BUILD_DIR)/main.bin: asm/main.asm
 	nasm $< -f bin -D SECTOR_COUNT_CONST=94 -o $@
 
-isr.bin: asm/isr.asm
+$(BUILD_DIR)/isr.bin: asm/isr.asm
 	nasm $< -f elf -o $@
-
-os-image.bin: main.bin kernel.bin
+$(BUILD_DIR)/enable_paging.bin: asm/enable_paging.asm
+	nasm $< -f elf -o $@
+$(BUILD_DIR)/os-image.bin: $(BUILD_DIR)/main.bin $(BUILD_DIR)/kernel.bin
 	cat $^ > $@
 
-run: os-image.bin
+run: $(BUILD_DIR)/os-image.bin
 	qemu-system-i386 -no-reboot -no-shutdown \
 		-device isa-debug-exit,iobase=0xf4,iosize=0x04 \
 		-drive file=$<,format=raw,index=0,if=floppy \
@@ -34,10 +44,10 @@ run: os-image.bin
 		-vga std \
 		-m 256M
 
-drive: os-image.bin
+drive: $(BUILD_DIR)/os-image.bin
 	qemu-system-i386 -no-reboot -no-shutdown \
 		-device isa-debug-exit,iobase=0xf4,iosize=0x04 \
-		-drive file=os-image.bin,format=raw,index=0,if=ide \
+		-drive file=$<,format=raw,index=0,if=ide \
 		-boot order=c \
 		-vga std \
 		-m 256M \
@@ -45,5 +55,4 @@ drive: os-image.bin
 		-d int,cpu_reset
 
 clean:
-	$(RM) *.bin *.o *.dis
-
+	$(RM) -r $(BUILD_DIR)
