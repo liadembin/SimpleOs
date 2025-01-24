@@ -14,9 +14,9 @@ call load_kernel
 ;mov bx,switch_mode
 ; call print16
 jmp $
-%include "gdt.asm"
-%include "print_16bit.asm"
-%include "switch_mode.asm"
+%include "./asm/gdt.asm"
+%include "./asm/print_16bit.asm"
+%include "./asm/switch_mode.asm"
 
 [bits 16]
 set_mode:

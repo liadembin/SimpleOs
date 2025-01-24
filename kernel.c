@@ -16,52 +16,11 @@ enum vga_color {
   VGA_COLOR_LIGHT_BROWN = 14,
   VGA_COLOR_WHITE = 15,
 };
+#include "ports.h"
+#include "stdlib.h"
 #include <stdint.h>
 #define NULL (char *)0x00;
-int strlen(const char *str) {
-  int cnt = 0;
-  while (str[cnt] != '\0')
-    cnt++;
-  return cnt;
-}
-int strcmp(char *c1, char *c2) {
-  int p = 0;
-  while (c1[p] != '\0' && c2[p] != '\0') {
-    if (c1[p] != c2[p++])
-      return 0;
-  }
-  return c1[p] == c2[p] && c2[p] == '\0';
-}
-void memcpy(char *dest, const char *src, unsigned int count) {
-  for (unsigned int i = 0; i < count; i++) {
-    *(dest + i) = *(src + i);
-  }
-}
-int get_str_index(char **arr, char *str, int arr_size) {
-  for (int i = 0; i < arr_size; i++) {
-    if (strcmp(arr[i], str))
-      return i;
-  }
-  return -1;
-}
-int stoi(char *buffer) {
-  int res = 0;
-  int ptr = 0;
-  while (buffer[ptr] != '\0') {
-    res *= 10;
-    res += buffer[ptr++] - '0';
-  }
-  return res;
-}
-static inline unsigned char inb(unsigned short port) {
-  unsigned char result;
-  __asm__ volatile("inb %1, %0" : "=a"(result) : "Nd"(port));
-  return result;
-}
 
-static inline void outb(unsigned short port, unsigned char data) {
-  __asm__ volatile("outb %0, %1" : : "a"(data), "Nd"(port));
-}
 #define SCREEN_WIDTH 80
 #define SCREEN_HEIGHT 25
 #define VIDEO_MEMORY 0xb8000
@@ -259,6 +218,7 @@ void load_idt() {
   idt_reg.limit = IDT_ENTRIES * sizeof(InterruptDescriptor32) - 1;
   asm volatile("lidt (%0)" : : "r"(&idt_reg));
 }
+// typedef void (*interupt_handler)();
 void isr_install() {
   add_idt_gate(0, (uint32_t)isr0);
   add_idt_gate(1, (uint32_t)isr1);
@@ -362,32 +322,7 @@ char *exception_messages[0x1F + 1] = {"Division By Zero",
                                       "Reserved",
                                       "Reserved",
                                       "Reserved"};
-void int_to_hex_string(unsigned int number, char *buffer, int buff_size) {
-  buffer[buff_size - 1] = '\0';
-  int index = buff_size - 2;
 
-  if (number == 0) {
-    buffer[index--] = '0';
-  } else {
-    while (number > 0 && index >= 0) {
-      int digit = number % 16;
-      if (digit < 10) {
-        buffer[index] = '0' + digit;
-      } else {
-        buffer[index] = 'A' + (digit - 10);
-      }
-      index--;
-      number /= 16;
-    }
-  }
-
-  if (index >= 0) {
-    int shift = index + 1;
-    for (int i = 0; i < buff_size - shift; i++) {
-      buffer[i] = buffer[i + shift];
-    }
-  }
-}
 #define SHOW_TIME 1
 void handle_clock_pulse() {
   static float time = 0;
@@ -611,13 +546,10 @@ void shell_handle(char *new_char) {
 }
 void keyboard_handler(registers_t *r) {
   uint8_t scancode = inb(0x60);
-
-  // Process the scancode here
-  // put_string("Keyboard scancode: ");
-  char s[16];
-  int_to_hex_string(scancode, s, 16);
-  // put_string(s);
-  // put_string("\10\13");
+  // char s[16];
+  // int_to_hex_string(scancode, s, 16);
+  //  put_string(s);
+  //  put_string("\10\13");
 
   const char *letter_from_code[KEY_AMOUNT] = {
       "ERROR",     "ESCAPE", "1",        "2",  "3",  "4",      "5",
@@ -643,79 +575,82 @@ void keyboard_handler(registers_t *r) {
   }
   // put_string("\10\13");
 }
+void print_state(registers_t *r) {
+  const int BUFF_SIZE = 15;
+  char buffer[BUFF_SIZE];
+  put_string("ds: 0x");
+  int_to_hex_string(r->ds, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
 
+  put_string("edi: 0x");
+  int_to_hex_string(r->edi, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", esi: 0x");
+  int_to_hex_string(r->esi, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("ebp: 0x");
+  int_to_hex_string(r->ebp, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", esp: 0x");
+  int_to_hex_string(r->esp, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("ebx: 0x");
+  int_to_hex_string(r->ebx, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", edx: 0x");
+  int_to_hex_string(r->edx, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("ecx: 0x");
+  int_to_hex_string(r->ecx, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", eax: 0x");
+  int_to_hex_string(r->eax, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("int_no: 0x");
+  int_to_hex_string(r->int_no, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", err_code: 0x");
+  int_to_hex_string(r->err_code, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("eip: 0x");
+  int_to_hex_string(r->eip, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", cs: 0x");
+  int_to_hex_string(r->cs, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("eflags: 0x");
+  int_to_hex_string(r->eflags, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("useresp: 0x");
+  int_to_hex_string(r->useresp, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", ss: 0x");
+  int_to_hex_string(r->ss, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+}
 // Modify the isr_handler
 // function to include IRQ handling
 void isr_handler(registers_t *r) {
-  const int BUFF_SIZE = 15;
-  char buffer[BUFF_SIZE]; // Increased buffer size for larger hex values
+  // Increased buffer size for larger hex values
   // put_string("Interrupt occurred:\10\13");
   //
-  // put_string("ds: 0x");
-  // int_to_hex_string(r->ds, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("edi: 0x");
-  // int_to_hex_string(r->edi, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string(", esi: 0x");
-  // int_to_hex_string(r->esi, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("ebp: 0x");
-  // int_to_hex_string(r->ebp, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string(", esp: 0x");
-  // int_to_hex_string(r->esp, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("ebx: 0x");
-  // int_to_hex_string(r->ebx, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string(", edx: 0x");
-  // int_to_hex_string(r->edx, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("ecx: 0x");
-  // int_to_hex_string(r->ecx, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string(", eax: 0x");
-  // int_to_hex_string(r->eax, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("int_no: 0x");
-  // int_to_hex_string(r->int_no, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string(", err_code: 0x");
-  // int_to_hex_string(r->err_code, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("eip: 0x");
-  // int_to_hex_string(r->eip, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string(", cs: 0x");
-  // int_to_hex_string(r->cs, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("eflags: 0x");
-  // int_to_hex_string(r->eflags, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
-  //
-  // put_string("useresp: 0x");
-  // int_to_hex_string(r->useresp, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string(", ss: 0x");
-  // int_to_hex_string(r->ss, buffer, BUFF_SIZE);
-  // put_string(buffer);
-  // put_string("\10\13");
+  // print_state(r)
 
   if (r->int_no >= 32 && r->int_no < 48) {
     // Handle IRQs
