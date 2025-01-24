@@ -1,11 +1,10 @@
 [bits 16]
 [org 0x7c00]
 KERNEL_OFFSET equ 0x1000
-
 ; BIOS sets boot drive in 'dl'; store for later use
 mov [BOOT_DRIVE], dl
 
-mov bp, 0x9000
+mov bp, 0xFF00
 mov sp, bp
 mov bx,starting
 call set_mode 
@@ -76,9 +75,6 @@ load_disk:
 disk_error:
     mov bx,disk_error_msg
     call print16
-    mov cx,62000
-l:
-    loop l
     jmp $; print a error msg later...
 not_all_read:
     

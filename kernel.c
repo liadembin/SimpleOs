@@ -1,3 +1,21 @@
+enum vga_color {
+  VGA_COLOR_BLACK = 0,
+  VGA_COLOR_BLUE = 1,
+  VGA_COLOR_GREEN = 2,
+  VGA_COLOR_CYAN = 3,
+  VGA_COLOR_RED = 4,
+  VGA_COLOR_MAGENTA = 5,
+  VGA_COLOR_BROWN = 6,
+  VGA_COLOR_LIGHT_GREY = 7,
+  VGA_COLOR_DARK_GREY = 8,
+  VGA_COLOR_LIGHT_BLUE = 9,
+  VGA_COLOR_LIGHT_GREEN = 10,
+  VGA_COLOR_LIGHT_CYAN = 11,
+  VGA_COLOR_LIGHT_RED = 12,
+  VGA_COLOR_LIGHT_MAGENTA = 13,
+  VGA_COLOR_LIGHT_BROWN = 14,
+  VGA_COLOR_WHITE = 15,
+};
 #include <stdint.h>
 #define NULL (char *)0x00;
 int strlen(const char *str) {
@@ -376,7 +394,7 @@ void handle_clock_pulse() {
   // each pulse should add 54.9 ms
   // if a full minute was passed we priotn
   const int interval = (1000 * 60);
-  put_string("Interval \n");
+  // put_string("Interval \n");
   int prevM = time / interval;
   time += 54.9;
   int currM = time / interval;
@@ -943,18 +961,8 @@ void *mmap(void *addr, unsigned int length, int fd) {}
 int munmap(void *addr, unsigned int length) {}
 void main() {
   char *video_memory = (char *)0xb8000;
-  // char message[] = {'H', 'e', 'l', 'l', 'o', ' ',
-  //   'W', 'o', 'r', 'l', 'd', '\0'
-  // };
-  // const char *message = "Hello World";
   char message[] = "Hello World\n";
-
-  // char mess2[] = "He\10\13Lllo\10a\10\13NewLine\10\13";
-  // put_string(mess2);
-  // put_string(message);
-  // put_string(message);
   put_string(message);
-  // char print[4] = "a\10\13";
   isr_install();
   __asm__ volatile("sti");
   put_string("Enabling paging\n");

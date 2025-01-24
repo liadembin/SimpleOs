@@ -24,15 +24,18 @@ run: os-image.bin
 		-boot a \
 		-vga std \
 		-m 256M 
+		# -monitor stdio \
+		# -d  int,cpu_reset
 				# -device i8042 \
 		# -k il
 drive: os-image.bin
 	qemu-system-i386 -no-reboot -no-shutdown \
-		-device isa-debug-exit,iobase=0xf4,iosize=0x04 \
-		# -drive file=floppy.img,format=raw,index=0,if=floppy \
-		-drive file=os-image.bin,format=raw,index=0,if=ide \
-		-boot order=ac \
-		-vga std \
-		-m 256M
+    -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
+    -drive file=os-image.bin,format=raw,index=0,if=ide \
+    -boot order=c \
+    -vga std \
+    -m 256M \
+    -monitor stdio \
+    -d int,cpu_reset
 clean:
 	$(RM) *.bin *.o *.dis
