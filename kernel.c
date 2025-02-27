@@ -1,4 +1,5 @@
 #include "kernel.h"
+#include <stdint.h>
 // #include "interrupts.h"
 // not mine also this is maddness
 
@@ -138,6 +139,7 @@ void handle_command(char *command, int length) {
                            sizeof(gnu_core_utils) / sizeof(gnu_core_utils[0]));
   if (indx == -1) {
     put_string("Unkown core util \n");
+    put_string(" >>>>");
     return;
   }
   typedef void (*util_handler)(char *, int);
@@ -184,7 +186,7 @@ void shell_handle(char *new_char) {
         ptr--;
       }
       Cursor_position pos = get_cursor_position();
-      if (pos.x > 0) {
+      if (pos.x > 5) {
         pos.x--;
       }
       clear_pixel(pos);
@@ -208,75 +210,6 @@ void shell_handle(char *new_char) {
   command_buffer[ptr++] = new_char[0];
 }
 
-void print_state(registers_t *r) {
-  const int BUFF_SIZE = 15;
-  char buffer[BUFF_SIZE];
-  put_string("ds: 0x");
-  int_to_hex_string(r->ds, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("edi: 0x");
-  int_to_hex_string(r->edi, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", esi: 0x");
-  int_to_hex_string(r->esi, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("ebp: 0x");
-  int_to_hex_string(r->ebp, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", esp: 0x");
-  int_to_hex_string(r->esp, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("ebx: 0x");
-  int_to_hex_string(r->ebx, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", edx: 0x");
-  int_to_hex_string(r->edx, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("ecx: 0x");
-  int_to_hex_string(r->ecx, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", eax: 0x");
-  int_to_hex_string(r->eax, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("int_no: 0x");
-  int_to_hex_string(r->int_no, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", err_code: 0x");
-  int_to_hex_string(r->err_code, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("eip: 0x");
-  int_to_hex_string(r->eip, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", cs: 0x");
-  int_to_hex_string(r->cs, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("eflags: 0x");
-  int_to_hex_string(r->eflags, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-
-  put_string("useresp: 0x");
-  int_to_hex_string(r->useresp, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string(", ss: 0x");
-  int_to_hex_string(r->ss, buffer, BUFF_SIZE);
-  put_string(buffer);
-  put_string("\10\13");
-}
 // Modify the isr_handler
 // function to include IRQ handling
 
@@ -438,18 +371,118 @@ void enable_new_paging() {
                        : "r"(page_directory)
                        : "%eax");
 }
+#include "pci.h"
+void read_bars(pci_device device) {
+  uint32_t bar0 = pciConfigReadWord(device.bus, device.slot, device.func, 0x10);
+  if ((bar0 & 0b11) == 0b00) {
+    put_string("ITS 32 \n");
+  } else if ((bar0 & 0b11) == 0b10) {
+    put_string("ITS 64\n");
+  } else {
+    put_string("IDK WTF \n");
+  }
+  // uint32_t bar2 = pciConfigReadWord(bus, slot, func, 0x18);
+  // There is also a BAR that will contain an I/O base address, this can be
+  // detected by looking at each BAR and testing bit 1. Documentation states
+  // this will be in either BAR2 or BAR4, but emulators may move it.
+  // https://www.google.com/search?q=how+many+BAR+in+pci&oq=how+many+BAR+in+pci&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQLhhA0gEIMzg3OGowajGoAgCwAgA&sourceid=chrome&ie=UTF-8
+  for (uint8_t bar = 1; bar < 6; bar++) {
+    uint32_t bar_value = pciConfigReadWord(device.bus, device.slot, device.func,
+                                           0x10 + 0x4 * bar);
+    if ((bar_value & 1) != 0) {
+      put_string("Found a fitting BAR");
+      char buffer[5];
+      int_to_hex_string(bar, buffer, 5);
+      put_string(buffer);
+      put_string("\n");
+      int_to_hex_string(bar_value, buffer, 5);
+      put_string("Its value is: ");
+      put_string(buffer);
+      put_string("\n");
+    }
+  }
+  return;
+}
+// uint16_t i8254x_read_eeprom(uint8_t addr) {
+//   uint32_t tmp;
+//   uint16_t data;
+//
+//   if ((le32_to_cpu(mmio_read_dword(dev_info.mmio.addr, I8254X_EECD)) &
+//        I8254X_EECD_EE_PRES) == 0) {
+//     kpanic("EEPROM present bit is not set for i8254x\n");
+//   }
+//
+//   /* Tell the EEPROM to start reading */
+//   if (dev_info.version == I82547GI_EI || dev_info.version == I82541EI_A0 ||
+//       dev_info.version == I82541EI_B0 || dev_info.version == I82541ER_C0 ||
+//       dev_info.version == I82541GI_B1 || dev_info.version == I82541PI_C0) {
+//     /* Specification says that only 82541x devices and the
+//      * 82547GI/EI do 2-bit shift */
+//     tmp = ((uint32_t)addr & 0xfff) << 2;
+//   } else {
+//     tmp = ((uint32_t)addr & 0xff) << 8;
+//   }
+//   tmp |= I8254X_EERD_START;
+//   mmio_write_dword(dev_info.mmio.addr, I8254X_EERD, cpu_to_le32(tmp));
+//
+//   /* Wait until the read is finished - then the DONE bit is cleared */
+//   timeout((le32_to_cpu(mmio_read_dword(dev_info.mmio.addr, I8254X_EERD)) &
+//            I8254X_EERD_DONE) == 0,
+//           100);
+//
+//   /* Obtain the data */
+//   data = (uint16_t)(le32_to_cpu(
+//                         mmio_read_dword(dev_info.mmio.addr, I8254X_EERD)) >>
+//                     16);
+//
+//   /* Tell EEPROM to stop reading */
+//   tmp = le32_to_cpu(mmio_read_dword(dev_info.mmio.addr, I8254X_EERD));
+//   tmp &= ~(uint32_t)I8254X_EERD_START;
+//   mmio_write_dword(dev_info.mmio.addr, I8254X_EERD, cpu_to_le32(tmp));
+//   return data;
+// }
 void main() {
   char *video_memory = (char *)0xb8000;
   char message[] = "Hello World\n";
   put_string(message);
   isr_install();
+  pci_device devices[16];
+  pci_device *ptrs[16];
   __asm__ volatile("sti");
-  put_string("Enabling paging\n");
+  // put_string("Enabling paging\n");
   // enable_new_paging();
   // enable_paging_asm();
 
   // enable_paging();
-  put_string("Paging is enabled \n");
+  // put_string("Paging is enabled \n");
+  put_string("Initializing the pci array \n");
+  int cnt = 0;
+  for (int i = 0; i < 16; i++) {
+
+    devices[i].vendor = 0xFFFF;
+    ptrs[i] = &devices[i];
+  }
+  put_string("Now scanning PCI bus. \n");
+  pci_device network;
+  // scan_pci_bus();
+  int device_amnt = pci_print_devices(ptrs);
+  char buffer[16];
+  for (int i = 0; i < device_amnt; i++) {
+    if (devices[i].device == NET_CARD_ID) {
+      put_string("Found a network card ");
+      int_to_hex_string((uint32_t)ptrs[i], buffer, 16);
+      put_string(buffer);
+      put_string("\n");
+      network = devices[i];
+    }
+  }
+  read_bars(network);
+  put_string("Running syscall");
+  __asm__("movl $0x1234, %eax\n"
+          "movl $0x4321, %ebx\n"
+          "int $0x8");
+  while (1)
+    ;
   put_string("Starting the Shell now, keyboard is loaded \n");
   put_string(" >>>>");
   // test_paging();
@@ -467,6 +500,6 @@ void main() {
   //   // }
   //   // clear_screen();
   // }
-  *(video_memory + 100) = 'V';
-  *(video_memory + 101) = 0x0f;
+  // *(video_memory + 100) = 'V';
+  // *(video_memory + 101) = 0x0f;
 }

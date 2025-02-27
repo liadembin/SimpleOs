@@ -65,6 +65,7 @@ void clear_screen() {
     clear_row(i); // might as well just write raw to buffer but idkk...
   }
 }
+
 void put_string(char *string) {
   // This is some shit ass code but its low level....
   Cursor_position cursor = get_cursor_position();
