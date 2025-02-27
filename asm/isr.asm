@@ -6,8 +6,8 @@ extern isr_handler
 global isr0
 isr0:
     cli
-    push dword 0
-    push dword 0
+    push byte 0
+    push byte 0
     mov edx,0xFF
     jmp isr_common_stub
 

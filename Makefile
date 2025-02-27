@@ -5,7 +5,7 @@ $(shell mkdir -p $(BUILD_DIR))
 
 all: run
 
-$(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel_entry.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/ports.o $(BUILD_DIR)/stdlib.o $(BUILD_DIR)/vga.o $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/isr.bin $(BUILD_DIR)/enable_paging.bin
+$(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel_entry.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/ports.o $(BUILD_DIR)/stdlib.o $(BUILD_DIR)/vga.o $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/pci.o $(BUILD_DIR)/isr.bin $(BUILD_DIR)/enable_paging.bin 
 	ld -m elf_i386 -o $@ -Ttext 0x1000 $^ --oformat binary
 
 $(BUILD_DIR)/kernel_entry.o: asm/kernel_entry.asm
@@ -21,6 +21,9 @@ $(BUILD_DIR)/stdlib.o: stdlib.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
 $(BUILD_DIR)/vga.o: vga.c
+	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
+
+$(BUILD_DIR)/pci.o: pci.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
 $(BUILD_DIR)/interrupts.o: interrupts.c

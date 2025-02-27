@@ -24,6 +24,76 @@ void load_idt() {
   idt_reg.limit = IDT_ENTRIES * sizeof(InterruptDescriptor32) - 1;
   asm volatile("lidt (%0)" : : "r"(&idt_reg));
 }
+void print_state(registers_t *r) {
+  const int BUFF_SIZE = 15;
+  char buffer[BUFF_SIZE];
+  put_string("ds: 0x");
+  int_to_hex_string(r->ds, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("edi: 0x");
+  int_to_hex_string(r->edi, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", esi: 0x");
+  int_to_hex_string(r->esi, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("ebp: 0x");
+  int_to_hex_string(r->ebp, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", esp: 0x");
+  int_to_hex_string(r->esp, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("ebx: 0x");
+  int_to_hex_string(r->ebx, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", edx: 0x");
+  int_to_hex_string(r->edx, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("ecx: 0x");
+  int_to_hex_string(r->ecx, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", eax: 0x");
+  int_to_hex_string(r->eax, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("int_no: 0x");
+  int_to_hex_string(r->int_no, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", err_code: 0x");
+  int_to_hex_string(r->err_code, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("eip: 0x");
+  int_to_hex_string(r->eip, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", cs: 0x");
+  int_to_hex_string(r->cs, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("eflags: 0x");
+  int_to_hex_string(r->eflags, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+
+  put_string("useresp: 0x");
+  int_to_hex_string(r->useresp, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string(", ss: 0x");
+  int_to_hex_string(r->ss, buffer, BUFF_SIZE);
+  put_string(buffer);
+  put_string("\10\13");
+}
+
 // typedef void (*interupt_handler)();
 void isr_install() {
   add_idt_gate(0, (uint32_t)isr0);
@@ -171,15 +241,36 @@ void keyboard_handler(registers_t *r) {
     // put_string(letter_from_code[scancode - 0x80]);
     // put_string(" (released)");
   } else {
+
     put_string("Unknown");
+    print_state(r);
   }
   // put_string("\10\13");
 }
+void handle_os_interrupt(registers_t *r) {
+  // switch on eax
+  switch (r->eax) {
+  case 0:
+    // read
+    put_string("Read not implemented yet.");
+    break;
+  case 1:
+    put_string("Write not impleemnted yet");
+    break;
+
+  case 9:
+    put_string("MMap is in development");
+    break;
+  case 11:
+    put_string("Munmap is in development");
+    break;
+  }
+}
 void isr_handler(registers_t *r) {
   // Increased buffer size for larger hex values
+  __asm__ volatile("cli");
   // put_string("Interrupt occurred:\10\13");
   //
-  // print_state(r)
 
   if (r->int_no >= 32 && r->int_no < 48) {
     // Handle IRQs
@@ -232,6 +323,10 @@ void isr_handler(registers_t *r) {
       outb(0xA0, 0x20); // Send EOI to slave PIC
     }
     outb(0x20, 0x20); // Send EOI to master PIC
+  } else if (r->int_no == 0x8) {
+    put_string("Its an user triggered int\n");
+    print_state(r);
+    handle_os_interrupt(r);
   } else {
     // Handle exceptions
     put_string("Exception: ");
