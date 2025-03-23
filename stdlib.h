@@ -1,4 +1,4 @@
-#define NULL (char *)0x00;
+#define NULL 0x00
 int strlen(const char *str);
 int strcmp(char *c1, char *c2);
 void memcpy(char *dest, const char *src, unsigned int count);
