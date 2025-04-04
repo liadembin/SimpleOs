@@ -12,9 +12,6 @@ typedef struct {
 	uint32_t device;
 	uint32_t func;
 } pci_id;
-
-#include "kernel.h"
-#include "ports.h"
 #include <stdint.h>
 uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func,
                            uint8_t offset);

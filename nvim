@@ -1,2 +1,1 @@
-gcc -m32 -g -ffreestanding -fno-pic -c kernel.c -o dist/kernel.o
 ld -m elf_i386 -o dist/kernel.bin -Ttext 0x1000 dist/kernel_entry.o dist/kernel.o dist/ports.o dist/stdlib.o dist/vga.o dist/interrupts.o dist/pci.o dist/isr.bin dist/enable_paging.bin --oformat binary

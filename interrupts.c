@@ -2,6 +2,7 @@
 #include "ports.h"
 #include "stdlib.h"
 #include "vga.h"
+#include "paging.h"
 #include <stdint.h>
 InterruptDescriptor32 idt[256];
 idt_register_t idt_reg;
@@ -341,6 +342,10 @@ void isr_handler(registers_t *r) {
     // put_string(bf);
     put_string(" ");
     put_string(err);
+    char* num[16];
+    int_to_hex_string(r->err_code, num, 16);
+    put_string(" ERR NUM :" );
+    put_string(num);
     put_string("\10\13");
     // while (1) {
     //   // Halt the system

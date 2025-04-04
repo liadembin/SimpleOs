@@ -1,5 +1,6 @@
-#include "kernel.h"
+//#include "kernel.h"
 #include "ports.h"
+// #include "vga.h"
 #include <stdint.h>
 uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func,
                            uint8_t offset) {
@@ -47,6 +48,7 @@ uint16_t getDeviceId(uint8_t bus, uint8_t slot, uint8_t func) {
 //   }
 //   return (vendor);
 // }
+
 #include "pci.h"
 int pci_print_devices(pci_device *devices[16]) {
   int cnt = 0;
@@ -59,16 +61,16 @@ int pci_print_devices(pci_device *devices[16]) {
           continue;
         uint16_t id = getDeviceId(bus, slot, func);
         char buffer[16];
-        int_to_hex_string(ven, buffer, 16);
-        put_string("Vendor id : ");
-        put_string(buffer);
-        int_to_hex_string(id, buffer, 16);
-        put_string(" Id: ");
-        put_string(buffer);
-        put_string(" function: ");
-        int_to_hex_string(func, buffer, 16);
-        put_string(buffer);
-        put_string("\n");
+        /*int_to_hex_string(ven, buffer, 16);*/
+        /*// put_string("Vendor id : ");*/
+        /*put_string(buffer);*/
+        /*int_to_hex_string(id, buffer, 16);*/
+        /*put_string(" Id: ");*/
+        /*put_string(buffer);*/
+        /*put_string(" function: ");*/
+        /*int_to_hex_string(func, buffer, 16);*/
+        /*put_string(buffer);*/
+        /*put_string("\n");*/
         pci_device *dv = devices[cnt++];
         dv->vendor = ven;
         dv->func = func;

@@ -1,4 +1,10 @@
-#include "kernel.h"
+#include "ports.h"
+#include "stdlib.h"
+#include "vga.h"
+#include "interrupts.h"
+#include "paging.h"
+#include "network.h"
+
 #include <stdint.h>
 // #include "interrupts.h"
 // not mine also this is maddness
@@ -214,168 +220,8 @@ void shell_handle(char *new_char) {
   command_buffer[ptr++] = new_char[0];
 }
 
-// Modify the isr_handler
-// function to include IRQ handling
 
-// ama just belive cluade translated correctly
-// cause i cant be bothered
-void _load_page_directory(unsigned int *page_directory) {
-  __asm__ volatile("push %%ebp\n\t"
-                   "mov %%esp, %%ebp\n\t"
-                   "mov %0, %%eax\n\t"
-                   "mov %%eax, %%cr3\n\t"
-                   "mov %%ebp, %%esp\n\t"
-                   "pop %%ebp"
-                   :
-                   : "r"(page_directory)
-                   : "%eax");
-}
-
-void _enable_paging(void) {
-  __asm__ volatile("push %%ebp\n\t"
-                   "mov %%esp, %%ebp\n\t"
-                   "mov %%cr0, %%eax\n\t"
-                   "or $0x80000000, %%eax\n\t"
-                   "mov %%eax, %%cr0\n\t"
-                   "mov %%ebp, %%esp\n\t"
-                   "pop %%ebp"
-                   :
-                   :
-                   : "%eax");
-}
-#define PAGE_COUNT 1024 // pulled from my ass, table should be 4mb
-// https://wiki.osdev.org/Paging#32-bit_Paging_(Protected_Mode)
-// They are the paging directory (PD), and the paging table (PT).
-// Both tables contain 1024 4-byte entries, making them 4 KiB each
-// entry points to a page table
-#define PDE_PRESENT_BIT                                                        \
-  0b1 // Bit 0 // or 'Present'. If the bit is set, the page is actually in
-      // physical memory
-      // at the moment. For example, when a page is swapped out, it is not in
-// physical memory and therefore not 'Present'. If a page is called, but not
-// present, a page fault will occur, and the OS should handle it. (See
-// below.)
-#define PDE_READ_WRITE_BIT                                                     \
-  0b10 // the 'Read/Write' permissions flag. If the bit is set, the page is
-// read/write. Otherwise when it is not set, the page is read-only. The WP
-// bit in CR0 determines if this is only applied to userland, always giving
-// the kernel write access (the default) or both userland and the kernel
-// (see Intel Manuals 3A 2-20).
-#define PDE_USER_USERVISOR_BIT                                                 \
-  0b100 //, the 'User/Supervisor' bit, controls access to the page based on
-// privilege level. If the bit is set, then the page may be accessed by all;
-// if the bit is not set, however, only the supervisor can access it. For a
-// page directory entry, the user bit controls access to all the pages
-// referenced by the page directory entry. Therefore if you wish to make a
-// page a user page, you must set the user bit in the relevant page
-// directory entry as well as the page table entry.
-#define PDE_WRITE_THROUGH_BIT                                                  \
-  0b1000 // controls Write-Through' abilities of the page. If the bit is set,
-         // write-through caching is enabled. If not, then write-back is enabled
-         // instead.
-#define PDE_CACHE_DISABLE_BIT                                                  \
-  0b10000 // is the 'Cache Disable' bit. If the bit is set, the page will not be
-          // cached. Otherwise, it will be.
-#define PDE_ACCESSED_BIT                                                       \
-  0b100000 // is used to discover whether a PDE or PTE was read during virtual
-           // address
-// translation. If it has, then the bit is set, otherwise, it is not. Note
-// that, this bit will not be cleared by the CPU, so that burden falls on
-// the OS (if it needs this bit at all).
-#define PDE_DIRTY_BIT                                                          \
-  0b1000000 // we can use both the 6,8 bits so the 6th repesents dirty
-
-#define PDE_IS_4MB_BIT                                                         \
-  0b10000000 // staight foward, if set(it wont be) it changes meaning of some
-             // stuff ie stuff like the DIRTY_BIT
-#define PDE_AVAILABLE_BIT                                                      \
-  0b10000000 // The remaining bits 9 through 11 (if PS=0, also bits 6 & 8) are
-             // not used by the processor, and are free for the OS to store some
-             // of its own accounting information. In addition, when P is not
-             // set, the processor ignores the rest of the entry and you can use
-             // all remaining 31 bits for extra information
-#define PTE_PRESENT_BIT 0b1
-#define PTE_READ_WRITE_BIT 0b10
-#define PTE_USER_USERVISOR_BIT 0b100
-#define PTE_WRITE_THROUGH_BIT 0b1000
-#define PTE_CACHE_DISABLE_BIT 0b10000
-#define PTE_ACCESSED_BIT 0b100000
-#define PTE_DIRTY_BIT 0b1000000
-#define PTE_PAT_BIT 0b10000000
-#define PTE_GLOBAL_BIT 0b100000000
-#define TABLE_COUNT 1024
-static int32_t page_directory[TABLE_COUNT]
-    __attribute__((aligned(4096))); // each value points to a page_table
-static int32_t page_tables[TABLE_COUNT][1024] __attribute__((aligned(4096)));
-void enable_paging() {
-  // clang-format off
-  //+--------------------------------------------------------------------------------+
-  //|                             PAGE DIRECTORY int32 structure                      |
-  //+--------------------------------------------------------------------------------+
-  //| 31                        12 | 11  10  9  8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
-  //+-------------------------------+---------------+---+---+---+---+---+---+---+---+
-  //| SECTOR (bits 31-12 of address)|  Free for use |4MB|AVL|ACC|CD |WT |U/S|R/W| P |
-  //+-------------------------------+---------------+---+---+---+---+---+---+---+---+
-  //| ????????????????????????????????| 0    0   0  0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 |
-  //+--------------------------------------------------------------------------------+
-  //
-  // SECTOR:    Physical address of 4KB aligned page table or page frame (bits 31-12)
-  // Free:      Bits 11-8 free for use
-  // 4MB:       0 = 4KB page, 1 = 4MB page (if PSE is 1 in CR4)
-  // AVL:       Available for system programmer's use
-  // ACC:       Accessed bit
-  // CD:        Cache disable
-  // WT:        Write-through cache
-  // U/S:       0 = Supervisor, 1 = User
-  // R/W:       0 = Read-only, 1 = Read/Write
-  // P:         Present bit
-  uint32_t page_dir_base = 0b000000000000000000000000000001011;
-
-  //+--------------------------------------------------------------------------------+
-  //|                             PAGE TABLE ENTRY int32 structure                    |
-  //+--------------------------------------------------------------------------------+
-  //| 31                        12 | 11  10  9  8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
-  //+-------------------------------+---------------+---+---+---+---+---+---+---+---+
-  //| FRAME (bits 31-12 of address) |  Free for use |PAT|G |D |A |CD |WT |U/S|R/W| P |
-  //+-------------------------------+---------------+---+---+---+---+---+---+---+---+
-  //| ????????????????????????????????| 0  0   0  0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 |
-  //+--------------------------------------------------------------------------------+
-  //
-  // FRAME:     Physical address of 4KB aligned page frame (bits 31-12)
-  // Free:      Bits 11-9 free for use (bit 8 used for PAT on some architectures)
-  // PAT:       Page Attribute Table (if supported)
-  // G:         Global page (if set, page is global)
-  // D:         Dirty (has been written to)
-  // A:         Accessed (has been read from or written to)
-  // CD:        Cache disable
-  // WT:        Write-through cache
-  // U/S:       0 = Supervisor, 1 = User
-  // R/W:       0 = Read-only, 1 = Read/Write
-  // P:         Present bit
-  // clang-format on
-}
-// no prot no flags
-// all pages are read/write except
-//  for now single procces(shell) so im not concerned
-//  just curious regrading paging
-void *mmap(void *addr, unsigned int length, int fd) {}
-int munmap(void *addr, unsigned int length) {}
-// extern void enable_paging_asm();
-void enable_new_paging() {
-  // static page_table
-  // static page_directory
-  // ima hope claude translated ok cause i aint learning c inline syntax(ie
-  // AT&T)
-  __asm__ __volatile__("mov %0, %%eax\n\t"
-                       "mov %%eax, %%cr3\n\t"
-                       "mov %%cr0, %%eax\n\t"
-                       "orl $0x80000001, %%eax\n\t"
-                       "mov %%eax, %%cr0"
-                       :
-                       : "r"(page_directory)
-                       : "%eax");
-}
-#include "pci.h"
+// #include "pci.h"
 void read_bars(pci_device device) {
   uint32_t bar0 = pciConfigReadWord(device.bus, device.slot, device.func, 0x10);
   if ((bar0 & 0b11) == 0b00) {
@@ -1166,21 +1012,6 @@ void main() {
     devices[i].vendor = 0xFFFF;
     ptrs[i] = &devices[i];
   }
-  put_string("Now scanning PCI bus. \n");
-  pci_device network;
-  // scan_pci_bus();
-  int device_amnt = pci_print_devices(ptrs);
-  char buffer[16];
-  for (int i = 0; i < device_amnt; i++) {
-    if (devices[i].device == NET_CARD_ID) {
-      put_string("Found a network card ");
-      int_to_hex_string((uint32_t)ptrs[i], buffer, 16);
-      put_string(buffer);
-      put_string("\n");
-      network = devices[i];
-    }
-  }
-  read_bars(network);
   put_string("Running syscall");
   __asm__("movl $0x1234, %eax\n"
           "movl $0x4321, %ebx\n"
@@ -1189,8 +1020,8 @@ void main() {
 
   ata_device_info device_info;
 
-  put_string("Identifying master drive...\n");
-  test_ata_driver();
+  /*put_string("Identifying master drive...\n");*/
+  /*test_ata_driver();*/
   // int result = identify_drive(0, identify_data, &device_info);
   // switch (result) {
   // case 0:
@@ -1211,10 +1042,56 @@ void main() {
   //   put_string("Error during identification\n");
   //   break;
   // }
-
+  char buffer[16];
   put_string("Starting the Shell now, keyboard is loaded \n");
   put_string(" >>>>");
-  // test_paging();
+  init_paging();
+  //0x10838 - 0x1001C
+  init_heap((void*)0x10000,2048 * 16);
+  put_string("Paging and memory maping enabled. \n");
+  void* page = kmalloc(2048);
+  for(int i = 0; i < 2048; i++) {
+    *(char*)(page + i) = 'A';
+  }
+  int_to_hex_string((unsigned long)page, buffer, 16);
+  put_string("Page value: ");
+  put_string(buffer);
+  void* page2 = kmalloc(2048);
+  for(int i = 0; i < 2048; i++) {
+    *(char*)(page2 + i) = 'B';
+  }
+  int_to_hex_string((unsigned long)page2, buffer, 16);
+  put_string("Page value: ");
+  put_string(buffer);
+  put_string("\n Sanity check \n");
+  for (int i = 0; i < 2048; i++) {
+    if (*(char*)(page + i) != 'A') {
+      put_string("Error in memory allocation \n");
+      break;
+    }
+  }
+  for (int i = 0; i < 2048; i++) {
+    if (*(char*)(page2 + i) != 'B') {
+      put_string("Error in memory allocation \n");
+      break;
+    }
+  }
+  put_string("Memory allocation is working \n");
+    put_string("Now scanning PCI bus. \n");
+  pci_device network;
+  // scan_pci_bus();
+  int device_amnt = pci_print_devices(ptrs);
+  for (int i = 0; i < device_amnt; i++) {
+    if (devices[i].device == NET_CARD_ID) {
+      put_string("Found a network card ");
+      int_to_hex_string((uint32_t)ptrs[i], buffer, 16);
+      put_string(buffer);
+      put_string("\n");
+      network = devices[i];
+    }
+  }
+  read_bars(network);
+  enable_network_card(network);
   // put_string(exception_messages[0]);
   // int a = 1 / 0;
   //  irq1();
