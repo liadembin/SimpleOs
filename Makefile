@@ -5,12 +5,11 @@ $(shell mkdir -p $(BUILD_DIR))
 
 all: run
 
-$(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel_entry.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/ports.o $(BUILD_DIR)/stdlib.o $(BUILD_DIR)/vga.o $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/pci.o $(BUILD_DIR)/isr.bin $(BUILD_DIR)/enable_paging.bin $(BUILD_DIR)/paging.o $(BUILD_DIR)/network.o
+$(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel_entry.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/ports.o $(BUILD_DIR)/stdlib.o $(BUILD_DIR)/vga.o $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/pci.o $(BUILD_DIR)/isr.bin $(BUILD_DIR)/enable_paging.bin $(BUILD_DIR)/paging.o $(BUILD_DIR)/network.o $(BUILD_DIR)/rtl8139.o
 	ld -m elf_i386 -o $@ -Ttext 0x1000 $^ --oformat binary
 
 $(BUILD_DIR)/kernel_entry.o: asm/kernel_entry.asm
 	nasm $< -f elf -o $@
-
 $(BUILD_DIR)/kernel.o: kernel.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
@@ -34,6 +33,8 @@ $(BUILD_DIR)/paging.o: paging.c
 
 $(BUILD_DIR)/network.o: network.c
 	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
+$(BUILD_DIR)/rtl8139.o: rtl.c
+	gcc -m32 -g -ffreestanding -fno-pic -c $< -o $@
 
 $(BUILD_DIR)/main.bin: asm/main.asm
 	nasm $< -f bin -D SECTOR_COUNT_CONST=94 -o $@
@@ -46,13 +47,17 @@ $(BUILD_DIR)/os-image.bin: $(BUILD_DIR)/main.bin $(BUILD_DIR)/kernel.bin
 	cat $^ > $@
 
 run: $(BUILD_DIR)/os-image.bin
-	qemu-system-i386 -no-reboot -no-shutdown \
+	sudo qemu-system-i386 \
+		-no-reboot -no-shutdown \
 		-device isa-debug-exit,iobase=0xf4,iosize=0x04 \
 		-drive file=$<,format=raw,index=0,if=floppy \
+		-netdev tap,id=n1,ifname=tap0,script=no,downscript=no \
+		-device rtl8139,mac=52:54:00:12:34:33,netdev=n1 \
+		-object filter-dump,id=f1,netdev=n1,file=netlog.pcap \
 		-boot a \
 		-vga std \
-		-m 256M
-
+		-m 256M \
+		-serial stdio
 drive: $(BUILD_DIR)/os-image.bin
 	qemu-system-i386 -no-reboot -no-shutdown \
 		-device isa-debug-exit,iobase=0xf4,iosize=0x04 \

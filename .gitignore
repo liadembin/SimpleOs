@@ -3,3 +3,4 @@
 .vim
 *.obj
 *.a
+dist/

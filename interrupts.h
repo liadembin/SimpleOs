@@ -1,13 +1,14 @@
 #ifndef INTERRUPTS_H
 #define INTERRUPTS_H
-
 #include "reg.h"
 #include <stdint.h>
+
 void isr_install();
 void load_idt();
 void isr_handler(registers_t *r);
 void keyboard_handler(registers_t *r);
 void handle_clock_pulse();
+
 extern void isr0();
 extern void isr1();
 extern void isr2();
@@ -40,6 +41,7 @@ extern void isr28();
 extern void isr29();
 extern void isr30();
 extern void isr31();
+
 typedef struct {
   uint16_t offset_1;       // offset bits 0..15
   uint16_t selector;       // a code segment selector in GDT or LDT
@@ -47,10 +49,12 @@ typedef struct {
   uint8_t type_attributes; // gate type, dpl, and p fields
   uint16_t offset_2;       // offset bits 16..31
 } __attribute__((packed)) InterruptDescriptor32;
+
 typedef struct {
   uint16_t limit;
   uint32_t base;
 } __attribute__((packed)) idt_register_t;
+
 extern void irq0();
 extern void irq1();
 extern void irq2();
@@ -71,5 +75,4 @@ extern void irq15();
 #define SHOW_TIME 1
 #define IDT_ENTRIES 256
 #define KEY_AMOUNT 62
-
 #endif

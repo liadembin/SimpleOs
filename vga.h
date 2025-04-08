@@ -1,3 +1,8 @@
+#ifndef VGA_H
+#define VGA_H
+#include "ports.h"
+#include <stdint.h>
+
 enum vga_color {
   VGA_COLOR_BLACK = 0,
   VGA_COLOR_BLUE = 1,
@@ -16,16 +21,18 @@ enum vga_color {
   VGA_COLOR_LIGHT_BROWN = 14,
   VGA_COLOR_WHITE = 15,
 };
+
 #define SCREEN_WIDTH 80
 #define SCREEN_HEIGHT 25
 #define VIDEO_MEMORY 0xb8000
 #define CURSOR_PORT_COMMAND 0x3D4
 #define CURSOR_PORT_DATA 0x3D5
-#define SCREEN_WIDTH 80
+
 typedef struct {
   int x;
   int y;
 } Cursor_position;
+
 Cursor_position get_cursor_position();
 void set_cursor_position(int x, int y);
 void put_pixel(char val, char col, int x, int y);
@@ -35,3 +42,4 @@ void scroll_line();
 void clear_pixel(Cursor_position cursor);
 void clear_screen();
 void put_string(char *string);
+#endif

@@ -1,8 +1,9 @@
 #include "interrupts.h"
+#include "paging.h"
 #include "ports.h"
+#include "rtl.h"
 #include "stdlib.h"
 #include "vga.h"
-#include "paging.h"
 #include <stdint.h>
 InterruptDescriptor32 idt[256];
 idt_register_t idt_reg;
@@ -180,7 +181,7 @@ char *exception_messages[0x1F + 1] = {"Division By Zero",
                                       "Stack Fault",
                                       "General Protection Fault",
                                       "Page Fault",
-                                      "Unknown Interrupt",
+                                      "Unknown Interrupt Arrow",
 
                                       "Coprocessor Fault",
                                       "Alignment Check",
@@ -242,9 +243,9 @@ void keyboard_handler(registers_t *r) {
     // put_string(letter_from_code[scancode - 0x80]);
     // put_string(" (released)");
   } else {
-
-    put_string("Unknown");
-    print_state(r);
+    // put_string("Arrow. to handle later");
+    /*put_string("Unknown");*/
+    /*print_state(r);*/
   }
   // put_string("\10\13");
 }
@@ -272,12 +273,15 @@ void isr_handler(registers_t *r) {
   __asm__ volatile("cli");
   // put_string("Interrupt occurred:\10\13");
   //
-
+  if (r->int_no == 32 + 0xB || r->int_no == 0xB) {
+    put_string("NIC \10\13");
+    // syscall_handler(r);
+  }
   if (r->int_no >= 32 && r->int_no < 48) {
     // Handle IRQs
     // put_string("Not an exception \10\13");
-    char buff[3];
-    int_to_hex_string(r->int_no, buff, 3);
+    char buff[5] = {0};
+    int_to_hex_string(r->int_no, buff, 5);
     // put_string(buff);
     /*
       IRQ 0 – system timer (cannot be changed)
@@ -306,19 +310,30 @@ void isr_handler(registers_t *r) {
       15 – secondary ATA channel
              */
     // TODO: replace with a dispatcher array
-    if (r->int_no == 33) {
+    if (r->int_no == 32) {
+      put_string("System timer \10\13");
+      // handle_clock_pulse();
+    }
+    if (r->int_no == 33) { // irq0
       // put_string("Clock!\10\13");
       handle_clock_pulse();
-    }
-    if (r->int_no == 34) {
+    } else if (r->int_no == 34) { // irq1
       // put_string("Keyboard!!!!!!!!\10\13");
       keyboard_handler(r);
-    }
-
-    if (r->int_no == 44) {
+    } else if (r->int_no == 44) {
+      put_string("NIC? \n");
+      rtl_handler(r);
+      // while(1);
+    } else if (r->int_no == 33 + 12) { // irq12
       put_string("We got a mouse baby \n");
+    } else {
+      put_string("IRQ FIERED: ");
+      put_string(buff);
+      put_string("\10\13");
+      print_state(r);
+      while (1)
+        ;
     }
-
     // Send EOI (End of Interrupt) signal to PICs
     if (r->int_no >= 40) {
       outb(0xA0, 0x20); // Send EOI to slave PIC
@@ -342,9 +357,9 @@ void isr_handler(registers_t *r) {
     // put_string(bf);
     put_string(" ");
     put_string(err);
-    char* num[16];
+    char *num[16];
     int_to_hex_string(r->err_code, num, 16);
-    put_string(" ERR NUM :" );
+    put_string(" ERR NUM :");
     put_string(num);
     put_string("\10\13");
     // while (1) {

@@ -34,6 +34,9 @@ int stoi(char *buffer) {
   return res;
 }
 void int_to_hex_string(unsigned int number, char *buffer, int buff_size) {
+  for (int i = 0; i < buff_size; i++) {
+    buffer[i] = ' ';
+  }
   buffer[buff_size - 1] = '\0';
   int index = buff_size - 2;
 
@@ -57,5 +60,10 @@ void int_to_hex_string(unsigned int number, char *buffer, int buff_size) {
     for (int i = 0; i < buff_size - shift; i++) {
       buffer[i] = buffer[i + shift];
     }
+  }
+}
+void memset(char *buffer, char value, int size) {
+  for (int i = 0; i < size; i++) {
+    buffer[i] = value;
   }
 }

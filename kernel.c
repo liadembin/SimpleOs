@@ -1,9 +1,9 @@
+#include "interrupts.h"
+#include "network.h"
+#include "paging.h"
 #include "ports.h"
 #include "stdlib.h"
 #include "vga.h"
-#include "interrupts.h"
-#include "paging.h"
-#include "network.h"
 
 #include <stdint.h>
 // #include "interrupts.h"
@@ -220,7 +220,6 @@ void shell_handle(char *new_char) {
   command_buffer[ptr++] = new_char[0];
 }
 
-
 // #include "pci.h"
 void read_bars(pci_device device) {
   uint32_t bar0 = pciConfigReadWord(device.bus, device.slot, device.func, 0x10);
@@ -230,12 +229,13 @@ void read_bars(pci_device device) {
     put_string("ITS 64\n");
   } else {
     put_string("IDK WTF \n");
+    char buffer[16];
+    int_to_hex_string(bar0, buffer, sizeof(buffer));
   }
   // uint32_t bar2 = pciConfigReadWord(bus, slot, func, 0x18);
   // There is also a BAR that will contain an I/O base address, this can be
   // detected by looking at each BAR and testing bit 1. Documentation states
   // this will be in either BAR2 or BAR4, but emulators may move it.
-  // https://www.google.com/search?q=how+many+BAR+in+pci&oq=how+many+BAR+in+pci&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQLhhA0gEIMzg3OGowajGoAgCwAgA&sourceid=chrome&ie=UTF-8
   for (uint8_t bar = 1; bar < 6; bar++) {
     uint32_t bar_value = pciConfigReadWord(device.bus, device.slot, device.func,
                                            0x10 + 0x4 * bar);
@@ -990,7 +990,7 @@ void test_ata_driver() {
     put_string("No ATA device found, test aborted.\n");
   }
 }
-
+#include "rtl.h"
 void main() {
   char *video_memory = (char *)0xb8000;
   char message[] = "Hello World\n";
@@ -1046,43 +1046,57 @@ void main() {
   put_string("Starting the Shell now, keyboard is loaded \n");
   put_string(" >>>>");
   init_paging();
-  //0x10838 - 0x1001C
-  init_heap((void*)0x10000,2048 * 16);
+  // 0x10838 - 0x1001C
+  init_heap((void *)0x10000, 2048 * 16);
   put_string("Paging and memory maping enabled. \n");
-  void* page = kmalloc(2048);
-  for(int i = 0; i < 2048; i++) {
-    *(char*)(page + i) = 'A';
+  void *page = kmalloc(2048);
+  for (int i = 0; i < 2048; i++) {
+    *(char *)(page + i) = 'A';
   }
   int_to_hex_string((unsigned long)page, buffer, 16);
   put_string("Page value: ");
   put_string(buffer);
-  void* page2 = kmalloc(2048);
-  for(int i = 0; i < 2048; i++) {
-    *(char*)(page2 + i) = 'B';
+  void *page2 = kmalloc(2048);
+  for (int i = 0; i < 2048; i++) {
+    *(char *)(page2 + i) = 'B';
   }
   int_to_hex_string((unsigned long)page2, buffer, 16);
   put_string("Page value: ");
   put_string(buffer);
   put_string("\n Sanity check \n");
   for (int i = 0; i < 2048; i++) {
-    if (*(char*)(page + i) != 'A') {
+    if (*(char *)(page + i) != 'A') {
       put_string("Error in memory allocation \n");
       break;
     }
   }
   for (int i = 0; i < 2048; i++) {
-    if (*(char*)(page2 + i) != 'B') {
+    if (*(char *)(page2 + i) != 'B') {
       put_string("Error in memory allocation \n");
       break;
     }
   }
   put_string("Memory allocation is working \n");
-    put_string("Now scanning PCI bus. \n");
+  put_string("Now scanning PCI bus. \n");
   pci_device network;
   // scan_pci_bus();
   int device_amnt = pci_print_devices(ptrs);
+
   for (int i = 0; i < device_amnt; i++) {
-    if (devices[i].device == NET_CARD_ID) {
+    int_to_hex_string(devices[i].vendor, buffer, 16);
+    put_string("Vendor: ");
+    put_string(buffer);
+    put_string("\n");
+    int_to_hex_string(devices[i].device, buffer, 16);
+    put_string("Device: ");
+    put_string(buffer);
+    put_string("\n");
+
+    // if (devices[i].device == NET_CARD_ID || devices[i].device == RTL8139_ID)
+    // {
+    //  the RTL8139
+    if (devices[i].device == 0x8139 || devices[i].device == 0x10EC) {
+
       put_string("Found a network card ");
       int_to_hex_string((uint32_t)ptrs[i], buffer, 16);
       put_string(buffer);
@@ -1090,8 +1104,14 @@ void main() {
       network = devices[i];
     }
   }
+  put_string("Free memory amount: \n");
+  char bufferl[32] = {0};
+  int_to_hex_string(get_free_memory(), bufferl, 32);
+  put_string(buffer);
+  put_string("Reading bars;");
   read_bars(network);
-  enable_network_card(network);
+  enable_rtl8139(network);
+  // enable_network_card(network);
   // put_string(exception_messages[0]);
   // int a = 1 / 0;
   //  irq1();
