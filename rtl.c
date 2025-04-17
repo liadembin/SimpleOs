@@ -248,7 +248,7 @@ void enable_rtl8139(pci_device device) {
   put_string("RTL8139 enabled\n");
   // rtl8139_send_test_packet(ioaddr);
   // Send a test packet
-  rtl8139_send_arp_discover(ioaddr, mac, 0, -1);
+  // rtl8139_send_arp_discover(ioaddr, mac, 0, -1);
 }
 void read_packet(uint16_t addr, uint32_t size) {
   // Read the packet from the receive buffer

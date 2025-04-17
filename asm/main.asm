@@ -3,7 +3,8 @@
 KERNEL_OFFSET equ 0x1000
 ; BIOS sets boot drive in 'dl'; store for later use
 mov [BOOT_DRIVE], dl
-
+mov ax,0x1000
+mov ss,ax
 mov bp, 0xFF00
 mov sp, bp
 mov bx,starting
